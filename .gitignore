@@ -1,0 +1,10 @@
+
+##################
+# intellij files #
+##################
+*.iws
+*.iml
+*.ipr
+!.idea/runConfigurations
+.idea/**
+.idea/*.*
