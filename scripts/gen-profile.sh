@@ -9,7 +9,7 @@ INPUT_FILES=(
   ../dotfiles/.aliasesrc
   ../dotfiles/.dirrc
   ../dotfiles/.shell-aliases
-  ../dotfiles/.tweak.sh
+  ../dotfiles/.tweak
   ../dotfiles/.zipping
 )
 
