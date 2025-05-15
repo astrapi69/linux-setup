@@ -1,46 +1,31 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 ################################################################################
-# Generate .profile or .zshrc based on the user's shell                       #
-# This script merges modular dotfiles into one unified profile file           #
+# gen-profile.sh                                                               #
+# Merges modular dotfiles into ~/.profile                                      #
 ################################################################################
 
-# Define input files
 INPUT_FILES=(
-  .aliasesrc
-  .bowerrc
-  .dirrc
-  .git-aliases
-  .gulprc
-  .mvnrc
-  .npmrc
-  .tweak.sh
-  .zipping
+  ../dotfiles/.aliasesrc
+  ../dotfiles/.dirrc
+  ../dotfiles/.shell-aliases
+  ../dotfiles/.tweak.sh
+  ../dotfiles/.zipping
 )
 
-# Detect user shell
-SHELL_NAME=$(basename "$SHELL")
-TARGET_FILE="$HOME/.profile"
+TARGET_PROFILE="$HOME/.profile"
 
-if [[ "$SHELL_NAME" == "zsh" ]]; then
-  TARGET_FILE="$HOME/.zshrc"
-fi
+echo "🔧 Generating $TARGET_PROFILE"
+> "$TARGET_PROFILE"
 
-# Announce action
-echo "🔧 Generating config for shell: $SHELL_NAME"
-echo "📄 Output file: $TARGET_FILE"
-echo "🔍 Combining the following files:"
-
-# Combine files
-> "$TARGET_FILE"
 for file in "${INPUT_FILES[@]}"; do
   if [[ -f "$file" ]]; then
-    echo "  ✅ $file"
-    cat "$file" >> "$TARGET_FILE"
-    echo -e "\n" >> "$TARGET_FILE"
+    echo "  ✅ Including $file"
+    cat "$file" >> "$TARGET_PROFILE"
+    echo -e "\n" >> "$TARGET_PROFILE"
   else
     echo "  ⚠️  Skipping missing file: $file"
   fi
 done
 
-echo "✅ Profile generated successfully!"
+echo "✅ Profile written to $TARGET_PROFILE"
