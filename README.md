@@ -49,6 +49,7 @@ bash install.sh
 ```
 
 This will:
+
 - Detect your shell (bash or zsh)
 - Generate a `.profile` or `.zshrc` by merging dotfiles
 - Ensure it's sourced in `.bashrc` or `.zshrc`
@@ -92,7 +93,8 @@ This project is licensed under the MIT License. See [`LICENSE`](./LICENSE) for d
 
 ## 🧩 Optional Software Installers
 
-This repository includes a collection of optional installation scripts located in the `scripts/` directory. These scripts install useful software such as:
+This repository includes a collection of optional installation scripts located in the `scripts/` directory. These
+scripts install useful software such as:
 
 - Git
 - Chromium
@@ -116,3 +118,12 @@ bash ./scripts/install-gnome-sushi.sh
 
 These scripts are safe to run individually, so you can pick and choose what you need.
 
+---
+
+## 🪪 Live USB Creation (Advanced Utility)
+
+If you want to safely create a bootable Linux Live USB using the `dd` command, check out the helper script and
+documentation in:
+
+```text
+py_script/py_script_create_live_usb_dryrun_doc.md
