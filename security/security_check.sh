@@ -1,108 +1,125 @@
-#!/bin/bash
-# security/security_check.sh
-# Automated Linux Security Audit Script
-
+#!/usr/bin/env bash
 set -euo pipefail
 
-REPORT="/var/log/security_check_$(date +%F).log"
-HOSTNAME=$(hostname)
-EMAIL="your@email.com"  # <-- REPLACE THIS WITH YOUR EMAIL
+# Configuration
+REPORT_DIR="/var/log/linux-setup"
+mkdir -p "$REPORT_DIR" 2>/dev/null || true
+STAMP="$(date +%F_%H%M%S)"
+REPORT="$REPORT_DIR/security_check_${STAMP}.log"
 
-# Ensure log directory exists
-sudo mkdir -p /var/log
+# Load optional environment config
+SECURITY_ENV="/etc/linux-setup/security.env"
+if [[ -f "$SECURITY_ENV" ]]; then
+    source "$SECURITY_ENV"
+fi
+
+# Helper functions
+section() { printf "\n===== %s =====\n" "$1" >&2; }
+have()    { command -v "$1" >/dev/null 2>&1; }
 
 # Start report
 {
-    echo "==== Security Report for $HOSTNAME ($(date)) ===="
-    echo ""
-} > "$REPORT"
+    echo "==== Security Report: $(hostname) — $(date -Is) ===="
 
-log_section() {
-    echo "" >> "$REPORT"
-    echo "[+] $1" >> "$REPORT"
-    echo "----------------------------------------" >> "$REPORT"
-}
-
-log_error() {
-    echo "[!] $1" >> "$REPORT"
-}
-
-# 1. Lynis System Audit
-log_section "Running Lynis Audit..."
-if command -v lynis >/dev/null; then
-    lynis audit system --quiet --report-file /var/log/lynis-report.dat 2>&1 | tee -a "$REPORT"
-else
-    log_error "Lynis not installed. Skipping audit."
-fi
-
-# 2. Rootkit Scans
-log_section "Running rkhunter..."
-if command -v rkhunter >/dev/null; then
-    rkhunter --update 2>&1 | tee -a "$REPORT"
-    rkhunter --cronjob --report-warnings-only 2>&1 | tee -a "$REPORT"
-else
-    log_error "rkhunter not installed. Skipping scan."
-fi
-
-log_section "Running chkrootkit..."
-if command -v chkrootkit >/dev/null; then
-    chkrootkit 2>&1 | tee -a "$REPORT"
-else
-    log_error "chkrootkit not installed. Skipping scan."
-fi
-
-# 3. Network & Process Inspection
-log_section "Listing Open Network Ports..."
-if command -v ss >/dev/null; then
-    ss -tulpn 2>&1 | tee -a "$REPORT"
-else
-    log_error "ss command not available. Install iproute2."
-fi
-
-log_section "Active Processes with Network Connections..."
-if command -v lsof >/dev/null; then
-    lsof -i -n -P 2>&1 | grep ESTABLISHED | tee -a "$REPORT"
-else
-    log_error "lsof not installed. Skipping process network check."
-fi
-
-# 4. Falco Status Check
-log_section "Checking Falco Status..."
-FALCO_ACTIVE=false
-for svc in falco-modern-bpf.service falco-bpf.service falco.service; do
-    if systemctl is-active --quiet "$svc" 2>/dev/null; then
-        echo "✅ Falco is running (active service: $svc)" >> "$REPORT"
-        FALCO_ACTIVE=true
-        break
+    section "LYNIS SYSTEM AUDIT"
+    if have lynis; then
+        lynis audit system --quiet --report-file /var/log/lynis-report.dat 2>/dev/null || true
+        if [[ -f /var/log/lynis-report.dat ]]; then
+            tail -n +1 /var/log/lynis-report.dat 2>/dev/null | sed 's/^/[lynis] /'
+        else
+            echo "[lynis] Report file not found."
+        fi
+    else
+        echo "[!] Lynis not installed. Skipping audit."
     fi
-done
 
-if [ "$FALCO_ACTIVE" = false ]; then
-    log_error "Falco is NOT running. Please check installation and service status."
-    echo "Suggested command: sudo systemctl status falco-modern-bpf.service falco-bpf.service falco.service" >> "$REPORT"
-fi
+    section "RKHUNTER SCAN"
+    if have rkhunter; then
+        rkhunter --update --nocolors 2>/dev/null || true
+        rkhunter --cronjob --report-warnings-only --nocolors 2>/dev/null || true
+    else
+        echo "[!] rkhunter not installed. Skipping scan."
+    fi
 
-# 5. Firewall Status (UFW)
-log_section "Firewall Status (UFW)..."
-if command -v ufw >/dev/null; then
-    ufw status verbose 2>&1 | tee -a "$REPORT"
-else
-    log_error "UFW not installed or not available."
-fi
+    section "CHKROOTKIT SCAN"
+    if have chkrootkit; then
+        chkrootkit 2>/dev/null || true
+    else
+        echo "[!] chkrootkit not installed. Skipping scan."
+    fi
 
-# Finalize report
-{
-    echo ""
-    echo "==== End of Report ===="
-} >> "$REPORT"
+    section "NETWORK: OPEN PORTS (ss)"
+    if have ss; then
+        # Use --no-header if available, else fall back to tail
+        if ss --help 2>&1 | grep -q -- '--no-header'; then
+            ss --no-header -tulpn 2>/dev/null || echo "[ss] No open ports or error occurred."
+        else
+            ss -tulpn 2>/dev/null | tail -n +2 || echo "[ss] No open ports or error occurred."
+        fi
+    else
+        echo "[!] 'ss' command not found. Install 'iproute2'."
+    fi
+
+    section "PROCESSES WITH NETWORK CONNECTIONS (lsof)"
+    if have lsof; then
+        lsof -n -P -i 2>/dev/null | grep -E "(ESTABLISHED|SYN_SENT)" || echo "[lsof] No active connections found."
+    else
+        echo "[!] 'lsof' not installed. Skipping network process check."
+    fi
+
+    section "FIREWALL STATUS (ufw)"
+    if have ufw; then
+        ufw status verbose 2>/dev/null || echo "[ufw] Status command failed."
+    else
+        echo "[!] UFW not installed. Skipping firewall check."
+    fi
+
+    section "FALCO STATUS & RECENT ALERTS"
+    FALCO_ACTIVE=false
+    for unit in falco-modern-bpf.service falco-bpf.service falco.service; do
+        if systemctl is-enabled "$unit" >/dev/null 2>&1 && systemctl is-active "$unit" >/dev/null 2>&1; then
+            echo "[systemd] Active Falco unit: $unit"
+            FALCO_ACTIVE=true
+            break
+        fi
+    done
+
+    if [[ "$FALCO_ACTIVE" == false ]]; then
+        echo "[!] Falco is not active. Please check installation."
+    else
+        # Fetch recent Falco alerts based on minimum severity
+        MIN_LEVEL="${FALCO_MIN_LEVEL:-WARNING}"
+        echo "[falco] Recent alerts (min level: $MIN_LEVEL) from last 24 hours:"
+        journalctl -u falco-modern-bpf.service -u falco-bpf.service -u falco.service --since "24 hours ago" --no-pager 2>/dev/null | \
+        awk -v min_level="$MIN_LEVEL" '
+        BEGIN {
+            levels = "INFO,WARNING,ERROR,CRITICAL"
+            split(levels, level_array, ",")
+            min_index = 0
+            for (i in level_array) {
+                if (level_array[i] == min_level) {
+                    min_index = i
+                    break
+                }
+            }
+        }
+        {
+            for (i = min_index; i <= length(level_array); i++) {
+                if ($0 ~ "\\[" level_array[i] "\\]") {
+                    print
+                    next
+                }
+            }
+        }' || echo "[falco] No alerts found at or above level $MIN_LEVEL."
+    fi
+
+    section "END OF REPORT"
+} | tee "$REPORT" >/dev/null
 
 # Optional: Send report via email
-if command -v mail >/dev/null 2>&1 && [ "$EMAIL" != "your@email.com" ]; then
-    echo "📧 Sending report to $EMAIL..."
-    cat "$REPORT" | mail -s "Security Report for $HOSTNAME" "$EMAIL"
-elif [ "$EMAIL" = "your@email.com" ]; then
-    echo "ℹ️  Email notification configured but placeholder email 'your@email.com' still in use. Please update and install 'mailutils'."
+if [[ -n "${EMAIL:-}" ]] && have mail; then
+    echo "📧 Sending report to: $EMAIL"
+    mail -s "Security Report: $(hostname) - $STAMP" "$EMAIL" < "$REPORT" 2>/dev/null || echo "[!] Failed to send email. Check 'mail' configuration."
 fi
 
 echo "✅ Report saved to: $REPORT"
-echo "To view: less $REPORT"

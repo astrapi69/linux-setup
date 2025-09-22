@@ -1,22 +1,58 @@
 # falco_rules_local.yaml
 # Custom detection rules for the linux-setup project
 
-- rule: Unexpected outbound connection from system service
+# Core macros required for rules
+
+- macro: spawned_process
+  condition: (evt.type = execve and evt.dir = <)
+
+- macro: outbound
+  condition: >
+    ((fd.typechar = 4 or fd.typechar = 6) and
+     (fd.sip != "0.0.0.0" and fd.sip != "::" and
+      fd.sip != "127.0.0.1" and fd.sip != "::1"))
+
+# Reusable macros for conditions
+
+- macro: system_procs
+  condition: (user.name = root or proc.name in (systemd, cron, crond, atd, dbus-daemon))
+
+- macro: shell_procs
+  condition: (proc.name in (bash, sh, dash, zsh, ash, csh, ksh, fish))
+
+- macro: shell_users
+  condition: (user.name in (root, vagrant, ubuntu, ec2-user, centos, containerd-shim))
+
+- macro: known_safe_outbound_connections
+  condition: >
+    (fd.name in (
+      ntp.ubuntu.com:123,
+      security.ubuntu.com:80,
+      archive.ubuntu.com:80,
+      deb.debian.org:80,
+      mirrors.edge.kernel.org:80,
+      packages.microsoft.com:443
+    ))
+
+# Rules
+
+- rule: Unexpected Outbound Connection from System Service
   desc: A system service (running as root or from /usr/sbin, /usr/lib) established an unexpected outbound network connection.
   condition: >
-    ((proc.name in (system_procs) or proc.path pmatch (/usr/sbin/*, /usr/lib/*))
+    ((proc.name in (system_procs) or proc.pname pmatch (/usr/sbin/*, /usr/lib/*))
      and evt.type = connect
-     and fd.type = ipv4
+     and fd.type in (ipv4, ipv6)
      and fd.sport != 53
      and fd.sport != 123
      and not fd.name in (known_safe_outbound_connections))
-  output: "Unexpected outbound connection from system service (command=%proc.cmdline connection=%fd.name user=%user.name)"
+  output: "Unexpected outbound connection from system service (command=%proc.cmdline connection=%fd.name user=%user.name parent=%proc.pname)"
   priority: WARNING
   tags: [network, mitre_lateral_movement]
 
-- rule: Shell spawned by non-interactive service
+- rule: Shell Spawned by Non-Interactive Service
   desc: A shell (e.g., bash, sh, zsh) was spawned by a non-interactive system service or daemon.
   condition: >
+    spawned_process and
     (proc.name in (shell_procs)
      and proc.pname != runc
      and proc.pname != docker
@@ -34,27 +70,40 @@
   priority: CRITICAL
   tags: [process, mitre_execution]
 
-- rule: Write to sensitive file below /etc
+- rule: Write to Sensitive File Below /etc
   desc: A process attempted to write to a sensitive file in the /etc directory (e.g., passwd, shadow, sudoers, sshd_config).
   condition: >
+    evt.is_open_write=true and
+    evt.type in (open, openat, creat) and
     (fd.name pmatch (/etc/passwd, /etc/shadow, /etc/group, /etc/gshadow, /etc/sudoers, /etc/ssh/sshd_config, /etc/crontab, /etc/fstab)
-     and evt.type in (open, openat)
-     and fd.typechar = f
-     and (fd.flags contains O_WRONLY or fd.flags contains O_RDWR))
-  output: "Write attempt to sensitive file below /etc (command=%proc.cmdline file=%fd.name user=%user.name)"
+     and fd.typechar = f)
+  output: "Write attempt to sensitive file below /etc (command=%proc.cmdline file=%fd.name user=%user.name parent=%proc.pname)"
   priority: CRITICAL
   tags: [filesystem, mitre_persistence, mitre_privilege_escalation]
 
-# Macros (optional, for reusability)
+- rule: Unexpected Outbound by Root Service
+  desc: A root-owned system service initiated an unexpected outbound network connection (DNS/NTP on ports 53/123 allowed).
+  condition: >
+    outbound and user.uid=0 and
+    (proc.name in (systemd, sshd, cron, crond, dbus-daemon, rsyslogd, systemd-networkd) or
+     proc.pname in (systemd, cron, crond, dbus-daemon)) and
+    not fd.sport in (53, 123)
+  output: "ALERT: Root service outbound connection (pid=%proc.pid proc=%proc.name cmdline=%proc.cmdline dst=%fd.sip:%fd.sport parent=%proc.pname)"
+  priority: WARNING
+  tags: [linux-setup, mitre_lateral_movement, network]
 
-- macro: system_procs
-  condition: (user.name = root or proc.name in (systemd, cron, crond, atd, dbus-daemon))
-
-- macro: shell_procs
-  condition: (proc.name in (bash, sh, dash, zsh, ash, csh, ksh, fish))
-
-- macro: shell_users
-  condition: (user.name in (root, vagrant, ubuntu, ec2-user, centos))
-
-- macro: known_safe_outbound_connections
-  condition: (fd.name in (ntp.ubuntu.com:123, security.ubuntu.com:80, archive.ubuntu.com:80))
+- rule: Write Executable in Temp Directory
+  desc: An executable-looking file was created in a temporary directory (common malware staging tactic).
+  condition: >
+    evt.is_open_write=true and
+    evt.type in (open, openat, creat) and
+    fd.directory in (/tmp, /var/tmp, /dev/shm) and
+    (fd.name endswith ".sh" or
+     fd.name endswith ".so" or
+     fd.name endswith ".bin" or
+     fd.name endswith ".out" or
+     fd.name endswith ".run" or
+     fd.name endswith ".elf")
+  output: "ALERT: Executable-looking file written to temp directory (user=%user.name file=%fd.name parent=%proc.pname cmdline=%proc.cmdline)"
+  priority: NOTICE
+  tags: [linux-setup, mitre_defense_evasion, malware]

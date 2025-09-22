@@ -40,3 +40,13 @@ sudo systemctl enable --now security-check.timer
 log "✅ Security Stack installation completed."
 log "📅 First automated report scheduled for: $(sudo systemctl list-timers security-check.timer --no-pager | tail -n +2 | awk '{print $2}')"
 log "🧪 Manual test: sudo /usr/local/bin/security_check.sh"
+
+# In scripts/install-security.sh, after installing helper tools:
+
+# Optional: Install mailutils for email reports
+read -p "Install mailutils for email reports? (y/N): " -n 1 -r
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]; then
+    "$DIR/install-mailutils.sh"
+    echo "ℹ️  Don't forget to configure EMAIL in /etc/linux-setup/security.env"
+fi

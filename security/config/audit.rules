@@ -32,3 +32,25 @@
 -w /sbin/route -p x -k network
 -w /sbin/ifconfig -p x -k network
 -w /bin/ip -p x -k network
+
+# Identity & Auth
+-w /etc/passwd -p wa -k identity
+-w /etc/group -p wa -k identity
+-w /etc/shadow -p wa -k identity
+
+# Sudo & SSH
+-w /etc/sudoers -p wa -k scope
+-w /etc/sudoers.d/ -p wa -k scope
+-w /etc/ssh/sshd_config -p wa -k sshd_config
+
+# Systemd & local binaries
+-w /etc/systemd/system/ -p wa -k systemd
+-w /usr/local/bin/ -p wa -k localbin
+
+# Kernel modules (load/unload)
+-a always,exit -F arch=b64 -S init_module -S finit_module -k kernel_module
+-a always,exit -F arch=b32 -S init_module -S finit_module -k kernel_module
+
+# Log root execs
+-a always,exit -F arch=b64 -S execve -F euid=0 -k exec_as_root
+-a always,exit -F arch=b32 -S execve -F euid=0 -k exec_as_root
