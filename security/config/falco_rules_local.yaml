@@ -39,8 +39,8 @@
 - rule: Unexpected Outbound Connection from System Service
   desc: A system service (running as root or from /usr/sbin, /usr/lib) established an unexpected outbound network connection.
   condition: >
+    evt.type = connect and
     ((proc.name in (system_procs) or proc.pname pmatch (/usr/sbin/*, /usr/lib/*))
-     and evt.type = connect
      and fd.type in (ipv4, ipv6)
      and fd.sport != 53
      and fd.sport != 123
@@ -84,6 +84,7 @@
 - rule: Unexpected Outbound by Root Service
   desc: A root-owned system service initiated an unexpected outbound network connection (DNS/NTP on ports 53/123 allowed).
   condition: >
+    evt.type = connect and
     outbound and user.uid=0 and
     (proc.name in (systemd, sshd, cron, crond, dbus-daemon, rsyslogd, systemd-networkd) or
      proc.pname in (systemd, cron, crond, dbus-daemon)) and
