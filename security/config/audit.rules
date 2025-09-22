@@ -1,0 +1,34 @@
+# Monitor changes to critical system files
+-w /etc/passwd -p wa -k identity
+-w /etc/shadow -p wa -k identity
+-w /etc/group -p wa -k identity
+-w /etc/sudoers -p wa -k privilege
+-w /etc/ssh/sshd_config -p wa -k ssh
+-w /etc/hosts.allow -p wa -k network
+-w /etc/hosts.deny -p wa -k network
+
+# Monitor access to executables in /usr/local/bin (common location for backdoors)
+-w /usr/local/bin/ -p wa -k local_bin
+
+# Monitor loading/unloading of kernel modules (common rootkit technique)
+-w /sbin/insmod -p x -k modules
+-w /sbin/rmmod -p x -k modules
+-w /sbin/modprobe -p x -k modules
+-a always,exit -F arch=b64 -S init_module -S delete_module -k modules
+
+# Monitor system and user management commands
+-a always,exit -F arch=b64 -S execve -F path=/usr/bin/sudo -k privilege
+-a always,exit -F arch=b64 -S execve -F path=/usr/bin/su -k privilege
+-a always,exit -F arch=b64 -S execve -F path=/usr/bin/passwd -k identity
+-a always,exit -F arch=b64 -S execve -F path=/usr/bin/useradd -k identity
+-a always,exit -F arch=b64 -S execve -F path=/usr/bin/userdel -k identity
+-a always,exit -F arch=b64 -S execve -F path=/usr/bin/groupadd -k identity
+-a always,exit -F arch=b64 -S execve -F path=/usr/bin/groupdel -k identity
+
+# Monitor network configuration changes
+-w /sbin/iptables -p x -k network
+-w /sbin/ip6tables -p x -k network
+-w /sbin/ebtables -p x -k network
+-w /sbin/route -p x -k network
+-w /sbin/ifconfig -p x -k network
+-w /bin/ip -p x -k network

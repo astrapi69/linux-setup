@@ -1,0 +1,8 @@
+[Unit]
+Description=Linux-Setup Security Report
+After=network.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/security_check.sh
+User=root

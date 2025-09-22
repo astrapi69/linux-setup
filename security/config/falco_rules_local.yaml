@@ -1,0 +1,60 @@
+# falco_rules_local.yaml
+# Custom detection rules for the linux-setup project
+
+- rule: Unexpected outbound connection from system service
+  desc: A system service (running as root or from /usr/sbin, /usr/lib) established an unexpected outbound network connection.
+  condition: >
+    ((proc.name in (system_procs) or proc.path pmatch (/usr/sbin/*, /usr/lib/*))
+     and evt.type = connect
+     and fd.type = ipv4
+     and fd.sport != 53
+     and fd.sport != 123
+     and not fd.name in (known_safe_outbound_connections))
+  output: "Unexpected outbound connection from system service (command=%proc.cmdline connection=%fd.name user=%user.name)"
+  priority: WARNING
+  tags: [network, mitre_lateral_movement]
+
+- rule: Shell spawned by non-interactive service
+  desc: A shell (e.g., bash, sh, zsh) was spawned by a non-interactive system service or daemon.
+  condition: >
+    (proc.name in (shell_procs)
+     and proc.pname != runc
+     and proc.pname != docker
+     and proc.pname != containerd
+     and proc.pname != systemd
+     and not user.name in (shell_users)
+     and not proc.pcmdline startswith "kubectl exec"
+     and not proc.pcmdline startswith "docker exec"
+     and not proc.pcmdline startswith "systemd-run --scope"
+     and not proc.pcmdline startswith "su -"
+     and not proc.pcmdline startswith "sudo -i"
+     and not proc.pcmdline startswith "login"
+     and not proc.pcmdline startswith "sshd:")
+  output: "Shell spawned by non-interactive service (command=%proc.cmdline parent=%proc.pname cmdline=%proc.pcmdline user=%user.name)"
+  priority: CRITICAL
+  tags: [process, mitre_execution]
+
+- rule: Write to sensitive file below /etc
+  desc: A process attempted to write to a sensitive file in the /etc directory (e.g., passwd, shadow, sudoers, sshd_config).
+  condition: >
+    (fd.name pmatch (/etc/passwd, /etc/shadow, /etc/group, /etc/gshadow, /etc/sudoers, /etc/ssh/sshd_config, /etc/crontab, /etc/fstab)
+     and evt.type in (open, openat)
+     and fd.typechar = f
+     and (fd.flags contains O_WRONLY or fd.flags contains O_RDWR))
+  output: "Write attempt to sensitive file below /etc (command=%proc.cmdline file=%fd.name user=%user.name)"
+  priority: CRITICAL
+  tags: [filesystem, mitre_persistence, mitre_privilege_escalation]
+
+# Macros (optional, for reusability)
+
+- macro: system_procs
+  condition: (user.name = root or proc.name in (systemd, cron, crond, atd, dbus-daemon))
+
+- macro: shell_procs
+  condition: (proc.name in (bash, sh, dash, zsh, ash, csh, ksh, fish))
+
+- macro: shell_users
+  condition: (user.name in (root, vagrant, ubuntu, ec2-user, centos))
+
+- macro: known_safe_outbound_connections
+  condition: (fd.name in (ntp.ubuntu.com:123, security.ubuntu.com:80, archive.ubuntu.com:80))
