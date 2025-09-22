@@ -1,7 +1,6 @@
 #!/bin/bash
-# security_check.sh – Automated Linux Security Audit
-# Author: Asterios Raptis
-# Version: 1.1 (Enhanced for production use)
+# security/security_check.sh
+# Automated Linux Security Audit Script
 
 set -euo pipefail
 
@@ -67,7 +66,7 @@ else
     log_error "lsof not installed. Skipping process network check."
 fi
 
-# 4. Falco Status Check (Check all possible service names)
+# 4. Falco Status Check
 log_section "Checking Falco Status..."
 FALCO_ACTIVE=false
 for svc in falco-modern-bpf.service falco-bpf.service falco.service; do
@@ -102,7 +101,7 @@ if command -v mail >/dev/null 2>&1 && [ "$EMAIL" != "your@email.com" ]; then
     echo "📧 Sending report to $EMAIL..."
     cat "$REPORT" | mail -s "Security Report for $HOSTNAME" "$EMAIL"
 elif [ "$EMAIL" = "your@email.com" ]; then
-    echo "ℹ️  Email notification configured but placeholder email 'your@email.com' still in use. Please update."
+    echo "ℹ️  Email notification configured but placeholder email 'your@email.com' still in use. Please update and install 'mailutils'."
 fi
 
 echo "✅ Report saved to: $REPORT"
