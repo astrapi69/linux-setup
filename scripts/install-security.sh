@@ -1,61 +1,61 @@
 #!/usr/bin/env bash
 # scripts/install-security.sh
-# Installiert den vollständigen Security-Stack und richtet den automatisierten Report-Timer ein.
+# Installs the full security stack and sets up the automated report timer.
 
 set -euo pipefail
 
-# Basisverzeichnis ermitteln und gemeinsame Funktionen laden
+# Determine base directory and load common functions
 DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$DIR/common.sh"
 
-log "🚀 Starte Installation des Security-Stacks..."
+log "🚀 Start installing the security stack..."
 
-# Schritt 1: Installiere die Kern-Security-Tools
+# Step 1: Install the core security tools
 "$DIR/install-lynis.sh"
 "$DIR/install-auditd.sh"
 "$DIR/install-falco.sh"
 "$DIR/install-firewall.sh"
 
-# Schritt 2: Installiere zusätzliche Hilfs-Tools für Monitoring und Analyse
-log "Installiere Hilfstools (rkhunter, chkrootkit, btop, ...)..."
+# Step 2: Install additional tools for monitoring and analysis
+log "Install helper tools (rkhunter, chkrootkit, btop, ...)..."
 pm_install rkhunter chkrootkit lsof net-tools btop glances nethogs
 
-# Schritt 3: Kopiere die Konfigurationsdateien für die Tools
-log "Kopiere Konfigurationsdateien..."
+# Step 3: Copy the configuration files for the tools
+log "Copy configuration files..."
 
-# Für Falco
+# for Falco
 sudo mkdir -p /etc/falco
-sudo cp "$DIR/../security/config/falco_rules_local.yaml" /etc/falco/ || log "⚠️  Warnung: falco_rules_local.yaml nicht gefunden"
+sudo cp "$DIR/../security/config/falco_rules_local.yaml" /etc/falco/ || log "⚠️  Warning: falco_rules_local.yaml not found"
 sudo systemctl restart falco 2>/dev/null || true
 
-# Für Auditd
+# for Auditd
 sudo mkdir -p /etc/audit/rules.d
-sudo cp "$DIR/../security/config/audit.rules" /etc/audit/rules.d/99-linux-setup.rules || log "⚠️  Warnung: audit.rules nicht gefunden"
+sudo cp "$DIR/../security/config/audit.rules" /etc/audit/rules.d/99-linux-setup.rules || log "⚠️  Warning: audit.rules not found"
 sudo systemctl restart auditd 2>/dev/null || true
 
-# Für Fail2ban
+# for Fail2ban
 sudo mkdir -p /etc/fail2ban/jail.d
-sudo cp "$DIR/../security/config/fail2ban/jail.local" /etc/fail2ban/jail.d/ || log "⚠️  Warnung: fail2ban jail.local nicht gefunden"
+sudo cp "$DIR/../security/config/fail2ban/jail.local" /etc/fail2ban/jail.d/ || log "⚠️  Warning: fail2ban jail.local not found"
 sudo systemctl restart fail2ban 2>/dev/null || true
 
-# Schritt 4: Installiere und aktiviere den automatisierten Security-Report-Timer
+# Step 4: Install and enable the automated security report timer
 log "Richte automatisierten Security-Report ein..."
 
-# Sicherstellen, dass das Zielverzeichnis existiert
+# Ensure that the target directory exists
 sudo install -d /usr/local/bin
 
-# Skript und Systemd-Units kopieren
+# Copy script and systemd units
 sudo install -m 0755 "$DIR/../security/security_check.sh" /usr/local/bin/security_check.sh
 sudo install -m 0644 "$DIR/../security/systemd/security-check.service" /etc/systemd/system/
 sudo install -m 0644 "$DIR/../security/systemd/security-check.timer"   /etc/systemd/system/
 
-# Logrotate-Konfiguration für die Reports
-sudo install -m 0644 "$DIR/../etc/logrotate.d/linux-setup" /etc/logrotate.d/linux-setup 2>/dev/null || log "ℹ️  Hinweis: Logrotate-Konfiguration nicht gefunden (optional)."
+# Logrotate configuration for the reports
+sudo install -m 0644 "$DIR/../etc/logrotate.d/linux-setup" /etc/logrotate.d/linux-setup 2>/dev/null || log "ℹ️  Note: Logrotate configuration not found (optional)."
 
-# Systemd neu laden und Timer aktivieren
+# Reload systemd and enable timer
 sudo systemctl daemon-reload
 sudo systemctl enable --now security-check.timer
 
-log "✅ Installation des Security-Stacks abgeschlossen."
-log "Der wöchentliche Report wird automatisch generiert. Erster Lauf: $(sudo systemctl list-timers security-check.timer --no-pager | tail -n +2 | awk '{print $2}')"
-log "Manueller Test: sudo /usr/local/bin/security_check.sh"
+log "✅ Installation of the security stack completed."
+log "The weekly report is generated automatically. First run: $(sudo systemctl list-timers security-check.timer --no-pager | tail -n +2 | awk '{print $2}')"
+log "Manual test: sudo /usr/local/bin/security_check.sh"

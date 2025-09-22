@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
-DIR="$(cd "$(dirname "$0")" && pwd)"; source "$DIR/common.sh"
+
+DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$DIR/common.sh"
 
 case "$(os_id)" in
   arch|manjaro)
@@ -11,7 +13,7 @@ case "$(os_id)" in
     yay -S --noconfirm falco
     ;;
   ubuntu|debian)
-    # Offizielles Falco-Repo für Debian/Ubuntu
+    # Official Falco repo for Debian/Ubuntu
     if ! dpkg -s falco >/dev/null 2>&1; then
       sudo install -d /usr/share/keyrings
       curl -fsSL https://falco.org/repo/falcosecurity-packages.asc \
@@ -22,16 +24,30 @@ case "$(os_id)" in
       sudo apt-get install -y falco
     fi
     ;;
-  *) echo "Unsupported distro"; exit 1 ;;
+  *)
+    echo "Unsupported distro: $(os_id)" >&2
+    exit 1
+    ;;
 esac
 
-# Units neu einlesen und **nur** reale Unit aktivieren (kein Alias!)
+# Ensure any previous Falco units are stopped to avoid conflicts
+sudo systemctl stop falco.service falco-bpf.service falco-modern-bpf.service 2>/dev/null || true
+
+# Reread units and activate **only** real units (no alias!)
 sudo systemctl daemon-reload
-if systemctl list-unit-files | grep -q '^falco-modern-bpf\.service'; then
+
+if systemctl list-unit-files --type=service | grep -q '^falco-modern-bpf\.service'; then
   sudo systemctl enable --now falco-modern-bpf.service
-elif systemctl list-unit-files | grep -q '^falco-bpf\.service'; then
+  log "✅ Falco (modern-bpf) enabled and started."
+elif systemctl list-unit-files --type=service | grep -q '^falco-bpf\.service'; then
   sudo systemctl enable --now falco-bpf.service
+  log "✅ Falco (bpf) enabled and started."
 else
   # Fallback (legacy/userspace)
-  sudo systemctl enable --now falco.service || true
+  if sudo systemctl enable --now falco.service; then
+    log "✅ Falco (legacy) enabled and started."
+  else
+    log "⚠️  Falco installation appears successful, but no service unit could be activated."
+    exit 1
+  fi
 fi

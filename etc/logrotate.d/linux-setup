@@ -1,0 +1,9 @@
+/var/log/security_check_*.log {
+    weekly
+    rotate 6
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 root root
+}

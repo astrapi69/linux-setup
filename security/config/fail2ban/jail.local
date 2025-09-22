@@ -1,19 +1,19 @@
-# Lokale Überschreibung für fail2ban
-# Diese Datei ergänzt /etc/fail2ban/jail.conf
+# Local override for fail2ban
+# This file supplements /etc/fail2ban/jail.conf
 
 [DEFAULT]
-# Globale Einstellungen
+# Global settings
 bantime  = 1h
 findtime = 10m
 maxretry = 5
 
-# E-Mail-Benachrichtigung (optional)
-# destemail = deine@email.de
+# Email notifications (optional)
+# destemail = your@email.com
 # sender = fail2ban@localhost
 # action = %(action_mwl)s
 
 [sshd]
-# SSH-Brute-Force-Schutz
+# SSH brute-force protection
 enabled = true
 port    = ssh
 logpath = %(sshd_log)s
@@ -21,7 +21,7 @@ backend = %(sshd_backend)s
 maxretry = 3
 bantime = 24h
 
-# Optional: Schutz für andere Dienste aktivieren
+# Optional: Enable protection for other services
 # [nginx-http-auth]
 # enabled = true
 # port    = http,https

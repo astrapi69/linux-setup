@@ -5,11 +5,11 @@ source "$DIR/common.sh"
 
 pm_install ufw fail2ban
 
-# UFW-Konfiguration: Standardregeln setzen
+# UFW configuration: Set default rules
 sudo ufw default deny incoming
 sudo ufw default allow outgoing
-sudo ufw allow 22/tcp || true  # SSH erlauben
+sudo ufw allow 22/tcp || true  # allow SSH
 sudo ufw --force enable
 
-# Fail2ban aktivieren
+# Enable Fail2ban
 sudo systemctl enable --now fail2ban
