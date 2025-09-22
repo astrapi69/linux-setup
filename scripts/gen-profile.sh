@@ -2,29 +2,31 @@
 
 ################################################################################
 # gen-profile.sh                                                               #
-# Merges modular dotfiles into ~/.profile                                      #
+# Merges modular dotfiles into ~/.profile from ~/.setup/dotfiles              #
 ################################################################################
 
-INPUT_FILES=(
-  ../dotfiles/.aliasesrc
-  ../dotfiles/.dirrc
-  ../dotfiles/.shell-aliases
-  ../dotfiles/.tweak
-  ../dotfiles/.zipping
-)
-
+DOTFILES_DIR="$HOME/.setup/dotfiles"
 TARGET_PROFILE="$HOME/.profile"
 
-echo "🔧 Generating $TARGET_PROFILE"
+INPUT_FILES=(
+  ".aliasesrc"
+  ".dirrc"
+  ".shell-aliases"
+  ".tweak"
+  ".zipping"
+)
+
+echo "🔧 Generating $TARGET_PROFILE from $DOTFILES_DIR"
 > "$TARGET_PROFILE"
 
 for file in "${INPUT_FILES[@]}"; do
-  if [[ -f "$file" ]]; then
-    echo "  ✅ Including $file"
-    cat "$file" >> "$TARGET_PROFILE"
+  full_path="$DOTFILES_DIR/$file"
+  if [[ -f "$full_path" ]]; then
+    echo "  ✅ Including $full_path"
+    cat "$full_path" >> "$TARGET_PROFILE"
     echo -e "\n" >> "$TARGET_PROFILE"
   else
-    echo "  ⚠️  Skipping missing file: $file"
+    echo "  ⚠️  Skipping missing file: $full_path"
   fi
 done
 

@@ -2,30 +2,43 @@
 
 ################################################################################
 # install.sh                                                                   #
-# Runs gen-profile.sh and appends source ~/.profile to shell rc file          #
+# Copies setup repo to ~/.setup, runs gen-profile.sh, and sources ~/.profile  #
 ################################################################################
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Define target setup directory
+SETUP_DIR="$HOME/.setup"
 
-# Run gen-profile.sh
-bash "$SCRIPT_DIR/gen-profile.sh"
+echo "📦 Copying setup files to $SETUP_DIR..."
+mkdir -p "$SETUP_DIR"
+cp -r "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"/* "$SETUP_DIR"
 
-TARGET_PROFILE="$HOME/.profile"
+# Run gen-profile.sh from new location
+bash "$SETUP_DIR/scripts/gen-profile.sh"
+
+# Add sourcing of utility scripts to the end of ~/.profile
+PROFILE_FILE="$HOME/.profile"
+
+for script in print_messages.sh detect_script_permissions.sh detect_os.sh; do
+  SOURCE_LINE="source $SETUP_DIR/scripts/$script"
+  if ! grep -Fxq "$SOURCE_LINE" "$PROFILE_FILE"; then
+    echo "$SOURCE_LINE" >> "$PROFILE_FILE"
+    echo "🔗 Added $SOURCE_LINE to $PROFILE_FILE"
+  fi
+done
+
+# Define shell-specific RC file
 SHELL_NAME=$(basename "$SHELL")
 RC_FILE="$HOME/.bashrc"
+[[ "$SHELL_NAME" == "zsh" ]] && RC_FILE="$HOME/.zshrc"
 
-if [[ "$SHELL_NAME" == "zsh" ]]; then
-  RC_FILE="$HOME/.zshrc"
-fi
-
-SOURCE_LINE="source $TARGET_PROFILE"
-
-# Append if not present
+# Ensure RC file sources the generated profile
+SOURCE_LINE="source $PROFILE_FILE"
 if ! grep -Fxq "$SOURCE_LINE" "$RC_FILE"; then
   echo -e "\n# Source generated profile\n$SOURCE_LINE" >> "$RC_FILE"
-  echo "🔗 Added source to $RC_FILE"
+  echo "🔗 Added profile source to $RC_FILE"
 else
-  echo "✅ $RC_FILE already sources $TARGET_PROFILE"
+  echo "✅ $RC_FILE already sources $PROFILE_FILE"
 fi
 
-echo "✅ Done. Run: source $RC_FILE"
+echo "✅ Setup complete!"
+echo "💡 Run this to activate changes now: source $RC_FILE"
