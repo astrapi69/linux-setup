@@ -4,22 +4,37 @@
 # - Keeps function name 'cleanup' for compatibility
 #######################################
 cleanup() {
-    info "🧹 Starting system cleanup for $OS..."
+  info "🧹 Starting system cleanup on $(hostname)"
 
-    case "$OS" in
-        ubuntu|debian|raspbian|wsl)
-            cleanup_debian_based
-            ;;
-        manjaro|arch)
-            cleanup_arch_based
-            ;;
-        *)
-            error "Unsupported OS: $OS. Skipping cleanup."
-            return 1
-            ;;
-    esac
+  if command -v apt-get >/dev/null 2>&1; then
+    sudo apt-get update -y
+    # prefer dist-upgrade, fallback to upgrade
+    sudo apt-get dist-upgrade -y || sudo apt-get upgrade -y
+    sudo apt-get autoremove -y
+    sudo apt-get autoclean -y
+    sudo apt-get clean -y
+    warning "APT cleanup done."
+  elif command -v pacman >/dev/null 2>&1; then
+    sudo pacman -Syu --noconfirm
+    # remove orphans if any
+    orphans="$(pacman -Qtdq 2>/dev/null || true)"
+    if [ -n "$orphans" ]; then
+      sudo pacman -Rns --noconfirm $orphans || true
+      info "Removed pacman orphans."
+    fi
+    # clean cache (keep 1 version); fallback to Sc if paccache missing
+    if command -v paccache >/dev/null 2>&1; then
+      sudo paccache -rk1 || true
+    else
+      sudo pacman -Sc --noconfirm || true
+    fi
+    warning "Pacman cleanup done."
+  else
+    error "Unsupported package manager – nothing to clean."
+    return 1
+  fi
 
-    info "✅ System cleanup completed for $OS."
+  info "✅ Cleanup finished."
 }
 
 ##########################################
