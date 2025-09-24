@@ -39,3 +39,25 @@ pm_install() {
             ;;
     esac
 }
+
+is_installed() {
+  case "$(pm)" in
+    pacman) pacman -Qi "$1" >/dev/null 2>&1 ;;
+    apt)    dpkg -s "$1" >/dev/null 2>&1 ;;
+    *) return 1 ;;
+  esac
+}
+
+is_running() {
+  systemctl is-active --quiet "$1"
+}
+
+enable_and_start() {
+  local unit="$1"
+  if ! systemctl is-enabled --quiet "$unit"; then
+    sudo systemctl enable "$unit"
+  fi
+  if ! is_running "$unit"; then
+    sudo systemctl start "$unit"
+  fi
+}
