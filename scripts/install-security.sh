@@ -9,6 +9,14 @@ source "$DIR/common.sh"
 
 log "🚀 Starting installation of the Security Stack..."
 
+# Step 0: Ensure jq is available (required for JSON reports)
+if ! command -v jq >/dev/null 2>&1; then
+    log "ℹ️  jq not found. Installing jq (required for JSON reports)..."
+    "$DIR/install-jq.sh"
+else
+    log "✅ jq already installed ($(jq --version))"
+fi
+
 # Step 1: Install core security tools
 "$DIR/install-lynis.sh"
 "$DIR/install-auditd.sh"
@@ -40,8 +48,6 @@ sudo systemctl enable --now security-check.timer
 log "✅ Security Stack installation completed."
 log "📅 First automated report scheduled for: $(sudo systemctl list-timers security-check.timer --no-pager | tail -n +2 | awk '{print $2}')"
 log "🧪 Manual test: sudo /usr/local/bin/security_check.sh"
-
-# In scripts/install-security.sh, after installing helper tools:
 
 # Optional: Install mailutils for email reports
 read -p "Install mailutils for email reports? (y/N): " -n 1 -r
