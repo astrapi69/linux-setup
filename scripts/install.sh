@@ -28,17 +28,25 @@ done
 
 # Define shell-specific RC file
 SHELL_NAME=$(basename "$SHELL")
-RC_FILE="$HOME/.bashrc"
-[[ "$SHELL_NAME" == "zsh" ]] && RC_FILE="$HOME/.zshrc"
 
-# Ensure RC file sources the generated profile
-SOURCE_LINE="source $PROFILE_FILE"
+case "$SHELL_NAME" in
+  bash)
+    RC_FILE="$HOME/.bashrc"
+    ;;
+  zsh)
+    RC_FILE="$HOME/.zshrc"
+    # ⚠️ Do not source .profile in zsh, use a managed file instead
+    SOURCE_LINE="source $SETUP_DIR/scripts/init_zsh.sh"
+    ;;
+  *)
+    RC_FILE="$HOME/.profile"
+    ;;
+esac
+
+# Only add if not already present
 if ! grep -Fxq "$SOURCE_LINE" "$RC_FILE"; then
-  echo -e "\n# Source generated profile\n$SOURCE_LINE" >> "$RC_FILE"
-  echo "🔗 Added profile source to $RC_FILE"
+  echo -e "\n# linux-setup profile\n$SOURCE_LINE" >> "$RC_FILE"
+  echo "🔗 Added $SOURCE_LINE to $RC_FILE"
 else
-  echo "✅ $RC_FILE already sources $PROFILE_FILE"
+  echo "✅ $RC_FILE already sources linux-setup"
 fi
-
-echo "✅ Setup complete!"
-echo "💡 Run this to activate changes now: source $RC_FILE"
