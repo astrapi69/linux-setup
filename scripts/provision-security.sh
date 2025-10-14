@@ -4,6 +4,25 @@
 
 set -euo pipefail
 
+LOG_DIR="/var/log/linux-setup"
+TS="$(date +%F_%H%M%S)"
+LOG_FILE="$LOG_DIR/provision-security_${TS}.log"
+JSON_FILE="$LOG_DIR/provision-security_${TS}.json"
+SUMMARY_MD="$HOME/linux-setup-report/latest.md"
+mkdir -p "$LOG_DIR" "$(dirname "$SUMMARY_MD")"
+
+# Alles mitschneiden
+exec > >(tee -a "$LOG_FILE") 2>&1
+
+# Helper zum JSON-Append
+json_add () {
+  # $1=key $2=value
+  printf '%s' "$(jq --arg k "$1" --arg v "$2" '.[$k]=$v' "${JSON_FILE:-/dev/null}" 2>/dev/null || echo '{}')" > "$JSON_FILE"
+}
+
+# Beispiel: Status sammeln
+json_add "distro" "$(source /etc/os-release; echo "$NAME $VERSION_ID")"
+
 log() { printf '\033[1;34m== %s\033[0m\n' "$*"; }
 warn(){ printf '\033[1;33m!! %s\033[0m\n' "$*" >&2; }
 die() { printf '\033[1;31m!! %s\033[0m\n' "$*" >&2; exit 1; }
