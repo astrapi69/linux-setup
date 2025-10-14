@@ -36,10 +36,10 @@ echo '{}' > "$JSON_FILE"
 json_set() {
   local key="$1" value="$2"
   jq --arg k "$key" --arg v "$value" '
-    def setpathdot($o;$v):
-      reduce ($o|split("."))[] as $p
-        (.; if has($p)|not then .[$p]={} else . end | .[$p]) = $v;
-    setpathdot($k;$v)
+    def setpathdot($path; $value):
+      reduce ($path | split("."))[] as $key
+        (.; setpath([$key]; $value));
+    setpathdot($k; $v)
   ' "$JSON_FILE" > "${JSON_FILE}.tmp" && mv "${JSON_FILE}.tmp" "$JSON_FILE"
 }
 
