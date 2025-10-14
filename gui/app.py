@@ -2,10 +2,14 @@
 import asyncio
 import json
 import sys
+import qasync
+import os
+import subprocess
+import signal
+import sys
 from PySide6 import QtWidgets, QtCore
 from dbus_next.aio import MessageBus
 from dbus_next import BusType
-import qasync
 from backend_client import BackendClient
 
 class MainWindow(QtWidgets.QWidget):
@@ -136,6 +140,9 @@ class MainWindow(QtWidgets.QWidget):
 
 
 def main():
+    # Handle Ctrl+C gracefully
+    signal.signal(signal.SIGINT, signal.SIG_DFL)
+
     app = QtWidgets.QApplication(sys.argv)
     loop = qasync.QEventLoop(app)
     asyncio.set_event_loop(loop)
@@ -149,8 +156,12 @@ def main():
         while window.isVisible():
             await asyncio.sleep(0.1)
 
-    with loop:
-        loop.run_until_complete(run())
+    try:
+        with loop:
+            loop.run_until_complete(run())
+    except KeyboardInterrupt:
+        print("\nExiting gracefully...")
+        sys.exit(0)
 
 
 if __name__ == "__main__":
