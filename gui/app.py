@@ -6,92 +6,133 @@ from PySide6 import QtWidgets, QtCore
 from dbus_next.aio import MessageBus
 from dbus_next import BusType
 import qasync
-
-SERVICE = "org.astrapi.LinuxSetup1"
-OBJ_PATH = "/org/astrapi/LinuxSetup1"
-IFACE = "org.astrapi.LinuxSetup1"
-
-
-class BackendClient:
-    def __init__(self):
-        self.bus = None
-        self.proxy_obj = None
-        self.iface = None
-
-    async def connect(self):
-        self.bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
-        introspection = await self.bus.introspect(SERVICE, OBJ_PATH)
-        self.proxy_obj = self.bus.get_proxy_object(SERVICE, OBJ_PATH, introspection)
-        self.iface = self.proxy_obj.get_interface(IFACE)
-
-    async def get_latest(self):
-        reply = await self.iface.call_get_latest()
-        return json.loads(reply)
-
-    async def audit(self, profile="desktop", quick=True):
-        reply = await self.iface.call_audit(profile, quick)
-        return json.loads(reply)
-
-    async def harden(self, profile="desktop"):
-        reply = await self.iface.call_harden(profile)
-        return json.loads(reply)
-
+from backend_client import BackendClient
 
 class MainWindow(QtWidgets.QWidget):
     def __init__(self, client: BackendClient):
         super().__init__()
         self.client = client
         self.setWindowTitle("Linux Setup – Security Dashboard")
-        self.resize(720, 520)
+        self.resize(800, 600)
 
-        self.text = QtWidgets.QPlainTextEdit(readOnly=True)
-        self.text.setPlaceholderText("Click a button to run an action...")
+        # Main layout
+        self.main_layout = QtWidgets.QVBoxLayout(self)
 
-        # ✅ All three buttons
-        self.btn_refresh = QtWidgets.QPushButton("Refresh (Latest)")
-        self.btn_audit = QtWidgets.QPushButton("Run Audit (Quick)")
-        self.btn_harden = QtWidgets.QPushButton("Apply Harden (Desktop)")
+        # Status bar
+        self.status_label = QtWidgets.QLabel("Loading latest report...")
+        self.main_layout.addWidget(self.status_label)
+
+        # Scroll area for findings
+        self.scroll = QtWidgets.QScrollArea()
+        self.scroll.setWidgetResizable(True)
+        self.scroll_content = QtWidgets.QWidget()
+        self.findings_layout = QtWidgets.QVBoxLayout(self.scroll_content)
+        self.scroll.setWidget(self.scroll_content)
+        self.main_layout.addWidget(self.scroll)
+
+        # Buttons
+        btn_row = QtWidgets.QHBoxLayout()
+        self.btn_audit = QtWidgets.QPushButton("Run Quick Audit")
+        self.btn_harden = QtWidgets.QPushButton("Apply All Safe Fixes")
+        self.btn_open_report = QtWidgets.QPushButton("Open Full Report")
+        btn_row.addWidget(self.btn_audit)
+        btn_row.addWidget(self.btn_harden)
+        btn_row.addWidget(self.btn_open_report)
+        self.main_layout.addLayout(btn_row)
 
         # Connect buttons
-        self.btn_refresh.clicked.connect(lambda: asyncio.create_task(self.refresh()))
         self.btn_audit.clicked.connect(lambda: asyncio.create_task(self.run_audit()))
-        self.btn_harden.clicked.connect(lambda: asyncio.create_task(self.run_harden()))
+        self.btn_harden.clicked.connect(lambda: asyncio.create_task(self.apply_all_safe()))
+        self.btn_open_report.clicked.connect(self.open_report)
 
-        # Layout
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.addWidget(self.text)
+        # Load data
+        asyncio.create_task(self.load_latest())
 
-        button_layout = QtWidgets.QHBoxLayout()
-        button_layout.addWidget(self.btn_refresh)
-        button_layout.addWidget(self.btn_audit)
-        button_layout.addWidget(self.btn_harden)
-        layout.addLayout(button_layout)
+    def clear_findings(self):
+        while self.findings_layout.count():
+            child = self.findings_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
 
-        # Initial load
-        QtCore.QTimer.singleShot(200, lambda: asyncio.create_task(self.refresh()))
-
-    async def refresh(self):
+    async def load_latest(self):
         try:
             data = await self.client.get_latest()
-            self.text.setPlainText(json.dumps(data, indent=2, ensure_ascii=False))
+            state = data.get("state", {})
+            findings = state.get("findings", [])
+            self.display_findings(findings)
+            self.status_label.setText(f"✅ Last run: {state.get('ts', 'unknown')} | {len(findings)} findings")
         except Exception as e:
-            self.text.setPlainText(f"❌ Error loading latest:\n{e}")
+            self.status_label.setText(f"❌ Failed to load report: {e}")
+
+    def display_findings(self, findings):
+        self.clear_findings()
+        if not findings:
+            self.findings_layout.addWidget(QtWidgets.QLabel("No security findings. System looks good! 🛡️"))
+            return
+
+        for f in findings:
+            card = self.create_finding_card(f)
+            self.findings_layout.addWidget(card)
+
+        self.findings_layout.addStretch()
+
+    def create_finding_card(self, finding):
+        frame = QtWidgets.QFrame()
+        frame.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
+        layout = QtWidgets.QVBoxLayout(frame)
+
+        # Title + severity
+        title = QtWidgets.QLabel(f"<b>{finding['title']}</b>")
+        severity = finding.get("severity", "info").lower()
+        color = {"high": "red", "medium": "orange", "low": "green"}.get(severity, "gray")
+        title.setStyleSheet(f"color: {color}; font-size: 14px;")
+
+        # Description
+        desc = QtWidgets.QLabel(finding.get("description", ""))
+        desc.setWordWrap(True)
+
+        # Fix button
+        btn_fix = QtWidgets.QPushButton("Apply Fix")
+        btn_fix.clicked.connect(lambda _, fid=finding["id"]: asyncio.create_task(self.apply_fix(fid)))
+
+        layout.addWidget(title)
+        layout.addWidget(desc)
+        layout.addWidget(btn_fix)
+
+        # Links (optional)
+        links = finding.get("links", [])
+        if links:
+            link_label = QtWidgets.QLabel(f"<a href='{links[0]}'>Learn more</a>")
+            link_label.setOpenExternalLinks(True)
+            layout.addWidget(link_label)
+
+        return frame
+
+    async def apply_fix(self, fix_id: str):
+        try:
+            result = await self.client.fix(fix_id)
+            self.status_label.setText(f"✅ Applied fix: {fix_id}")
+            asyncio.create_task(self.load_latest())  # refresh
+        except Exception as e:
+            self.status_label.setText(f"❌ Fix failed: {e}")
+
+    async def apply_all_safe(self):
+        self.status_label.setText("Applying all safe fixes...")
+        # For now, just re-run harden
+        await self.client.harden(profile="desktop")
+        asyncio.create_task(self.load_latest())
 
     async def run_audit(self):
-        self.text.setPlainText("Running audit (quick)...\n")
-        try:
-            data = await self.client.audit(profile="desktop", quick=True)
-            self.text.setPlainText(json.dumps(data, indent=2, ensure_ascii=False))
-        except Exception as e:
-            self.text.setPlainText(f"❌ Audit failed:\n{e}")
+        self.status_label.setText("Running quick audit...")
+        await self.client.audit(profile="desktop", quick=True)
+        asyncio.create_task(self.load_latest())
 
-    async def run_harden(self):
-        self.text.setPlainText("Applying hardening (desktop profile)...\n")
-        try:
-            data = await self.client.harden(profile="desktop")
-            self.text.setPlainText(json.dumps(data, indent=2, ensure_ascii=False))
-        except Exception as e:
-            self.text.setPlainText(f"❌ Harden failed:\n{e}")
+    def open_report(self):
+        report_path = "/home/astrapi69/linux-setup-report/latest.md"
+        if os.path.exists(report_path):
+            subprocess.run(["xdg-open", report_path])
+        else:
+            self.status_label.setText("Report not found.")
 
 
 def main():

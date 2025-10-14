@@ -34,6 +34,9 @@ def run_provision(mode: str, profile: str = "", quick: bool=False):
 
     # Build command
     cmd = [ "bash", str(script), mode ]
+    # Inside run_provision()
+    if mode == "fix" and profile:  # profile holds fix_id
+        cmd += ["--fix", profile]
     if profile:
         cmd += ["--profile", profile]
     if quick and mode == "audit":
