@@ -41,6 +41,15 @@ cd ~/linux-setup
 
 > Replace `YOUR_USERNAME` with your GitHub username.
 
+## Provision Security (one-shot)
+
+After cloning, run a single provisioning script to install and enable the full security stack (Ubuntu/Debian):
+
+```bash
+sudo bash scripts/provision-security.sh
+```
+
+
 ### 3. Run the Installation Script
 
 ```bash
