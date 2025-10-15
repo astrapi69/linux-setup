@@ -1,0 +1,25 @@
+[tool.poetry]
+name = "linux-setup"
+version = "0.1.0"
+description = "One-command Linux security hardening with TUI + Qt GUI"
+authors = ["Asterios Raptis <aster.raptis@gmail.com>"]
+license = "MIT"
+readme = "README.md"
+packages = [{ include = "gui" }]
+
+[tool.poetry.dependencies]
+# Cap Python to satisfy PySide6 markers
+python = ">=3.9,<3.14"
+
+[tool.poetry.group.gui.dependencies]
+# Qt GUI stack
+PySide6 = ">=6.8"
+dbus-next = ">=0.2.3"
+qasync = ">=0.27.1"
+
+[tool.poetry.scripts]
+linux-setup-gui = "gui.app:main"
+
+[build-system]
+requires = ["poetry-core>=1.7.0"]
+build-backend = "poetry.core.masonry.api"

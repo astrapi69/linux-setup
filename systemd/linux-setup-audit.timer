@@ -1,0 +1,9 @@
+[Unit]
+Description=Weekly Linux Setup audit
+
+[Timer]
+OnCalendar=weekly
+Persistent=true
+
+[Install]
+WantedBy=timers.target

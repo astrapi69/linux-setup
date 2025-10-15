@@ -1,0 +1,6 @@
+[Unit]
+Description=Run Linux Setup audit
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/linux-setup-backend audit --profile desktop --quick

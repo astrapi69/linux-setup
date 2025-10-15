@@ -1,0 +1,13 @@
+[Unit]
+Description=Linux Setup D-Bus Backend
+After=dbus.service
+Requires=dbus.service
+
+[Service]
+ExecStart=/usr/bin/linux-setupd
+Restart=on-failure
+User=root
+Type=simple
+
+[Install]
+WantedBy=multi-user.target
