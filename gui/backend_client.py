@@ -1,3 +1,4 @@
+# gui/backend_client.py
 import asyncio
 import json
 from dbus_next.aio import MessageBus
@@ -6,7 +7,6 @@ from dbus_next import BusType
 SERVICE = "org.astrapi.LinuxSetup1"
 OBJ_PATH = "/org/astrapi/LinuxSetup1"
 IFACE = "org.astrapi.LinuxSetup1"
-
 
 class BackendClient:
     def __init__(self):
