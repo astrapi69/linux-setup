@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Provision full security stack from this repo (Ubuntu/Debian focused).
 # Idempotent: safe to re-run. Requires root.
+
 # Parse args
 MODE="harden"
 PROFILE="desktop"
@@ -23,10 +24,23 @@ LOG_DIR="/var/log/linux-setup"
 TS="$(date +%F_%H%M%S)"
 LOG_FILE="$LOG_DIR/provision-security_${TS}.log"
 JSON_FILE="$LOG_DIR/provision-security_${TS}.json"
-SUMMARY_MD="$HOME/linux-setup-report/latest.md"
+
+# Determine a suitable user home for the human-readable report
+# If running via sudo, HOME is /root. Prefer the invoking user’s home.
+if [[ -n "${SUDO_USER:-}" && "$HOME" = "/root" ]]; then
+  USER_HOME="$(getent passwd "$SUDO_USER" | cut -d: -f6)"
+  : "${USER_HOME:="/root"}"
+else
+  USER_HOME="$HOME"
+fi
+
+SUMMARY_MD="$USER_HOME/linux-setup-report/latest.md"
 mkdir -p "$LOG_DIR" "$(dirname "$SUMMARY_MD")"
 
-# Alles mitschneiden
+# Ensure the user can read the report directory/file
+chown -R "${SUDO_USER:-root}":"${SUDO_USER:-root}" "$(dirname "$SUMMARY_MD")" || true
+
+# Record all output (stdout + stderr) to both console and log file
 exec > >(tee -a "$LOG_FILE") 2>&1
 
 # Initialize JSON
@@ -57,10 +71,10 @@ json_add() {
   jq --arg k "$key" --arg v "$value" '.[$k] = $v' "$JSON_FILE" > "${JSON_FILE}.tmp" && mv "${JSON_FILE}.tmp" "$JSON_FILE"
 }
 
-# Logging
-log() { printf '\033[1;34m== %s\033[0m\n' "$*"; }
-warn(){ printf '\033[1;33m!! %s\033[0m\n' "$*" >&2; }
-die() { printf '\033[1;31m!! %s\033[0m\n' "$*" >&2; exit 1; }
+# Logging helpers
+log()  { printf '\033[1;34m== %s\033[0m\n' "$*"; }
+warn() { printf '\033[1;33m!! %s\033[0m\n' "$*" >&2; }
+die()  { printf '\033[1;31m!! %s\033[0m\n' "$*" >&2; exit 1; }
 
 # --- root check
 [[ ${EUID:-$(id -u)} -eq 0 ]] || die "Run as root: sudo bash $0"
@@ -84,9 +98,8 @@ log "Package manager: $PM"
 # Record metadata
 json_set "run_id" "$(date -Iseconds)"
 json_set "distro" "$(source /etc/os-release; echo "$NAME $VERSION_ID")"
-json_set "profile" "desktop"
-json_set "mode" "$MODE"
 json_set "profile" "$PROFILE"
+json_set "mode" "$MODE"
 
 # --- packages
 install_apt() {
@@ -258,7 +271,7 @@ cat > "$SUMMARY_MD" <<EOF
 
 ## 🔍 Key Findings
 
-$(jq -r '.findings[] | "- **[\(.severity | ascii_upcase)]** \(.title) (\(.id))" ' "$JSON_FILE" 2>/dev/null || echo "- No findings recorded.")
+$(jq -r '.findings[] | "- **[\(.severity | ascii_upcase)]** \(.title) (\(.id))"' "$JSON_FILE" 2>/dev/null || echo "- No findings recorded.")
 
 ## 🛠️ Next Steps (Recommended)
 

@@ -1,7 +1,7 @@
 # gui/app.py
-import asyncio
 import sys
 import signal
+import asyncio
 from PySide6 import QtWidgets
 import qasync
 from .backend_client import BackendClient
@@ -9,6 +9,11 @@ from .main_window import MainWindow
 
 
 def main():
+    """
+    Entry point for the Security Dashboard GUI.
+    Sets up a qasync event loop so Qt + asyncio play nicely.
+    """
+
     # Handle Ctrl+C gracefully
     signal.signal(signal.SIGINT, signal.SIG_DFL)
 
