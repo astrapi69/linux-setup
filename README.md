@@ -149,7 +149,7 @@ Includes validation, device detection, and dry-run safety before writing with `d
 
 ---
 
-## 🧑‍💻 Development
+## 🧑💻 Development
 
 Build or extend the GUI easily using [Poetry](https://python-poetry.org/).
 
@@ -171,7 +171,7 @@ Explore more in the [linux-setup Wiki](https://github.com/astrapi69/linux-setup/
 * [🔒 Security Verification, Falco & TUI](https://github.com/astrapi69/linux-setup/wiki/Security-Verification)
 * [🖥️ GUI Dashboard (Qt)](https://github.com/astrapi69/linux-setup/wiki/GUI-Dashboard-%28Qt%29)
 * [❓ FAQ & Troubleshooting](https://github.com/astrapi69/linux-setup/wiki/FAQ-&-Troubleshooting)
-* [🧑‍💻 Development](https://github.com/astrapi69/linux-setup/wiki/Development)
+* [🧑💻 Development](https://github.com/astrapi69/linux-setup/wiki/Development)
 
 ---
 
